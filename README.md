@@ -38,7 +38,7 @@ In top level build file
 
 ```kotlin
 plugins {
-     id("org.jetbrains.kotlinx.kover") version "0.4.1"
+     id("org.jetbrains.kotlinx.kover") version "0.4.2"
 }
 ```
 </details>
@@ -48,7 +48,7 @@ plugins {
 
 ```groovy
 plugins {
-    id 'org.jetbrains.kotlinx.kover' version '0.4.1'
+    id 'org.jetbrains.kotlinx.kover' version '0.4.2'
 }
 ```
 </details>
@@ -66,7 +66,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.jetbrains.kotlinx:kover:0.4.1")
+        classpath("org.jetbrains.kotlinx:kover:0.4.2")
     }
 }
 
@@ -83,7 +83,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.jetbrains.kotlinx:kover:0.4.1'
+        classpath 'org.jetbrains.kotlinx:kover:0.4.2'
     }
 }
   
@@ -234,7 +234,7 @@ You may specify custom directory to collect reports from all modules in the buil
 
 ```kotlin
 tasks.koverCollectReports {
-    into { "$buildDir/my-reports-dir" }
+  outputDir.set(layout.buildDirectory.dir("my-reports-dir") )
 }
 ```
 </details>
@@ -244,7 +244,7 @@ tasks.koverCollectReports {
 
 ```groovy
 tasks.koverCollectReports {
-    into "$buildDir/my-reports-dir"
+  outputDir.set(layout.buildDirectory.dir("my-reports-dir") )
 }
 ```
 </details>
@@ -259,7 +259,7 @@ In the module in which the plugin is applied, you need to add code:
 kover {
     isEnabled = true                        // false to disable instrumentation of all test tasks in all modules
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set("1.0.614")    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set("1.0.622")    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set("0.8.7")        // change version of JaCoCo agent and reporter
     generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
 }
@@ -273,7 +273,7 @@ kover {
 kover {
     enabled = true                          // false to disable instrumentation of all test tasks in all modules
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set('1.0.614')    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set('1.0.622')    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set('0.8.7')        // change version of JaCoCo agent and reporter
     generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
 }
@@ -356,5 +356,5 @@ The plugin, when applied, automatically creates tasks for the module (all module
 - `koverXmlReport` - Generates code coverage XML report for all module's test tasks.
 - `koverHtmlReport` - Generates code coverage HTML report for all module's test tasks.
 - `koverReport` - Executes both `koverXmlReport` and `koverHtmlReport` tasks.
-- `koverCollectReports` - Collects reports from all submodules in one directory. Main directory is `$buildDir/reports/kover/all`, names for XML reports and dirs for HTML is a projects names.
+- `koverCollectReports` - Collects reports from all submodules in one directory. Default directory is `$buildDir/reports/kover/all`, names for XML reports and dirs for HTML are projects names. Executing this task does not run `koverXmlReport` or `koverHtmlReport`, it only copies previously created reports if they exist to the output directory.
 - `koverVerify` - Verifies code coverage metrics based on specified rules. Always executes before `check` task.

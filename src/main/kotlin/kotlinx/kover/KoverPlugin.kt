@@ -43,27 +43,24 @@ class KoverPlugin : Plugin<Project> {
     }
 
     private fun Project.createCollectingTask() {
-        tasks.create(COLLECT_TASK_NAME, Copy::class.java) {
+        tasks.create(COLLECT_TASK_NAME, KoverCollectingTask::class.java) {
             it.group = VERIFICATION_GROUP
             it.description = "Collects reports from all submodules in one directory."
-            allprojects { sub ->
-                val xmlReportTask = sub.tasks.withType(KoverXmlReportTask::class.java).getByName(XML_REPORT_TASK_NAME)
+            it.outputDir.set(project.layout.buildDirectory.dir("reports/kover/all"))
+            // disable UP-TO-DATE check for task: it will be executed every time
+            it.outputs.upToDateWhen { false }
+
+            allprojects { proj ->
+                val xmlReportTask = proj.tasks.withType(KoverXmlReportTask::class.java).getByName(XML_REPORT_TASK_NAME)
                 val htmlReportTask =
-                    sub.tasks.withType(KoverHtmlReportTask::class.java).getByName(HTML_REPORT_TASK_NAME)
+                    proj.tasks.withType(KoverHtmlReportTask::class.java).getByName(HTML_REPORT_TASK_NAME)
 
                 it.mustRunAfter(xmlReportTask)
                 it.mustRunAfter(htmlReportTask)
 
-                it.from(xmlReportTask.xmlReportFile) { sp ->
-                    sp.rename { "${sub.name}.xml" }
-                }
-
-                it.from(htmlReportTask.htmlReportDir) { sp ->
-                    sp.into("html/${sub.name}/")
-                }
+                it.xmlFiles[proj.name] = xmlReportTask.xmlReportFile
+                it.htmlDirs[proj.name] = htmlReportTask.htmlReportDir
             }
-
-            it.into(layout.buildDirectory.dir("reports/kover/all"))
         }
     }
 
@@ -149,6 +146,7 @@ class KoverPlugin : Plugin<Project> {
                 .map { t -> t.extensions.getByType(KoverTaskExtension::class.java) }
                 .filter { e -> e.isEnabled }
                 .map { e -> e.binaryReportFile.get() }
+                .filter { f -> f.exists() }
             files(files)
         }
         xmlReportTask.binaryReportFiles.set(binariesProvider)
@@ -185,7 +183,7 @@ class KoverPlugin : Plugin<Project> {
                 if (koverExtension.coverageEngine.get() == CoverageEngine.INTELLIJ) intellijAgent.config else jacocoAgent.config
             })
 
-            it.onlyIf { t -> (t as KoverCommonTask).binaryReportFiles.get().files.any { f -> f.exists() } }
+            it.onlyIf { t -> !(t as KoverCommonTask).binaryReportFiles.get().isEmpty }
 
             block(it)
         }
@@ -211,7 +209,7 @@ class KoverPlugin : Plugin<Project> {
         taskExtension.isEnabled = true
         taskExtension.binaryReportFile.set(this.project.provider {
             val suffix = if (koverExtension.coverageEngine.get() == CoverageEngine.INTELLIJ) ".ic" else ".exec"
-            project.layout.buildDirectory.get().file("kover/${project.name}/$name$suffix").asFile
+            project.layout.buildDirectory.get().file("kover/$name$suffix").asFile
         })
         jvmArgumentProviders.add(
             CoverageArgumentProvider(
