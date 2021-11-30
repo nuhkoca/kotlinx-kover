@@ -15,8 +15,8 @@ open class KoverHtmlReportTask : KoverCommonTask() {
     /**
      * Specifies directory path of generated HTML report.
      */
+    @get:OutputDirectory
     val htmlReportDir: DirectoryProperty = project.objects.directoryProperty()
-        @OutputDirectory get
 
     @TaskAction
     fun generate() {
@@ -25,6 +25,7 @@ open class KoverHtmlReportTask : KoverCommonTask() {
         if (coverageEngine.get() == CoverageEngine.INTELLIJ) {
             intellijReport(
                 binaryReportFiles.get(),
+                smapFiles.get(),
                 srcDirs.get(),
                 outputDirs.get(),
                 null,
