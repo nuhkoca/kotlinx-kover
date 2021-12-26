@@ -1,39 +1,50 @@
 package kotlinx.kover.test.functional.core
 
 import kotlinx.kover.api.*
+import kotlinx.kover.test.functional.cases.utils.*
 import org.gradle.testkit.runner.*
 import org.w3c.dom.*
 import java.io.*
 import javax.xml.parsers.*
 
 
-internal class ProjectRunnerImpl(private val projects: Map<ProjectSlice, File>) : ProjectRunner {
+internal class GradleRunnerImpl(private val projects: Map<ProjectSlice, File>) :
+    GradleRunner {
 
-    override fun run(vararg args: String, checker: RunResult.() -> Unit): ProjectRunnerImpl {
+    override fun run(vararg args: String, checker: RunResult.() -> Unit): GradleRunnerImpl {
         val argsList = listOf(*args)
 
-        projects.forEach { (slice, project) -> project.runGradle(argsList, slice, checker) }
+        projects.forEach { (slice, project) ->
+            try {
+                project.runGradle(argsList, checker)
+            } catch (e: Throwable) {
+                throw AssertionError("Assertion error occurred in test for project $slice", e)
+            }
+        }
 
         return this
     }
+}
 
-    private fun File.runGradle(args: List<String>, slice: ProjectSlice, checker: RunResult.() -> Unit) {
-        val buildResult = GradleRunner.create()
-            .withProjectDir(this)
-            .withPluginClasspath()
-            .addPluginTestRuntimeClasspath()
-            .withArguments(args)
-            .build()
-
-        try {
-            RunResultImpl(buildResult, slice, this).apply(checker)
-        } catch (e: Throwable) {
-            throw AssertionError("Assertion error occurred in test for project $slice", e)
-        }
+internal class SingleGradleRunnerImpl(private val projectDir: File) : GradleRunner {
+    override fun run(vararg args: String, checker: RunResult.() -> Unit): SingleGradleRunnerImpl {
+        projectDir.runGradle(listOf(*args), checker)
+        return this
     }
 }
 
-private fun GradleRunner.addPluginTestRuntimeClasspath() = apply {
+private fun File.runGradle(args: List<String>, checker: RunResult.() -> Unit) {
+    val buildResult = org.gradle.testkit.runner.GradleRunner.create()
+        .withProjectDir(this)
+        .withPluginClasspath()
+        .addPluginTestRuntimeClasspath()
+        .withArguments(args)
+        .build()
+
+    RunResultImpl(buildResult, this).apply { checkIntellijErrors() }.apply(checker)
+}
+
+private fun org.gradle.testkit.runner.GradleRunner.addPluginTestRuntimeClasspath() = apply {
     val classpathFile = File(System.getProperty("plugin-classpath"))
     if (!classpathFile.exists()) {
         throw IllegalStateException("Could not find classpath resource $classpathFile")
@@ -44,10 +55,43 @@ private fun GradleRunner.addPluginTestRuntimeClasspath() = apply {
 }
 
 
-private class RunResultImpl(private val result: BuildResult, private val slice: ProjectSlice, dir: File) : RunResult {
+private class RunResultImpl(private val result: BuildResult, private val dir: File) : RunResult {
     val buildDir: File = File(dir, "build")
 
-    override val engine: CoverageEngine = slice.engine ?: CoverageEngine.INTELLIJ
+    private val buildScriptFile: File = buildFile()
+    private val buildScript: String by lazy { buildScriptFile.readText() }
+
+    override val engine: CoverageEngine by lazy {
+        if (buildScript.contains("set(kotlinx.kover.api.CoverageEngine.JACOCO)")) {
+            CoverageEngine.JACOCO
+        } else {
+            CoverageEngine.INTELLIJ
+        }
+    }
+
+    override val projectType: ProjectType by lazy {
+        if (buildScriptFile.name.substringAfterLast(".") == "kts") {
+            if (buildScript.contains("""kotlin("jvm")""")) {
+                ProjectType.KOTLIN_JVM
+            } else if (buildScript.contains("""kotlin("multiplatform")""")) {
+                ProjectType.KOTLIN_MULTIPLATFORM
+            } else {
+                throw IllegalArgumentException("Impossible to determine the type of project")
+            }
+        } else {
+            if (buildScript.contains("""id 'org.jetbrains.kotlin.jvm'""")) {
+                ProjectType.KOTLIN_JVM
+            } else if (buildScript.contains("""id 'org.jetbrains.kotlin.multiplatform'""")) {
+                ProjectType.KOTLIN_MULTIPLATFORM
+            } else {
+                throw IllegalArgumentException("Impossible to determine the type of project")
+            }
+        }
+    }
+
+    override fun subproject(name: String, checker: RunResult.() -> Unit) {
+        RunResultImpl(result, File(dir, name)).also(checker)
+    }
 
     override fun output(checker: String.() -> Unit) {
         result.output.checker()
@@ -66,6 +110,13 @@ private class RunResultImpl(private val result: BuildResult, private val slice: 
     override fun outcome(taskPath: String, checker: TaskOutcome.() -> Unit) {
         result.task(taskPath)?.outcome?.checker()
             ?: throw IllegalArgumentException("Task '$taskPath' not found in build result")
+    }
+
+    private fun buildFile(): File {
+        val file = File(dir, "build.gradle")
+        if (file.exists() && file.isFile) return file
+
+        return File(dir, "build.gradle.kts")
     }
 }
 

@@ -5,16 +5,16 @@
 package kotlinx.kover.engines.intellij
 
 import kotlinx.kover.api.*
+import kotlinx.kover.engines.commons.*
+import kotlinx.kover.engines.commons.Report
+import kotlinx.kover.engines.commons.ReportFiles
 import org.gradle.api.*
 import org.gradle.api.file.*
 import java.io.*
 import java.util.*
 
 internal fun Task.intellijReport(
-    binaryReportFiles: Iterable<File>,
-    smapFiles: Iterable<File>,
-    sources: Iterable<File>,
-    outputs: Iterable<File>,
+    report: Report,
     xmlFile: File?,
     htmlDir: File?,
     classpath: FileCollection
@@ -29,7 +29,7 @@ internal fun Task.intellijReport(
 
     val argsFile = File(temporaryDir, "intellijreport.json")
     argsFile.printWriter().use { pw ->
-        pw.writeModuleReportJson(binaryReportFiles, smapFiles, sources, outputs, xmlFile, htmlDir)
+        pw.writeReportsJson(report, xmlFile, htmlDir)
     }
 
     project.javaexec { e ->
@@ -37,8 +37,22 @@ internal fun Task.intellijReport(
         e.classpath = classpath
         e.args = mutableListOf(argsFile.canonicalPath)
     }
+
+    project.copyIntellijErrorLog(project.layout.buildDirectory.get().file("kover/errors/$name.log").asFile)
 }
 
+internal fun Project.copyIntellijErrorLog(toFile: File, customDirectory: File? = null) {
+    var errorLog = customDirectory?.let { File(it, "coverage-error.log") }
+
+    if (errorLog == null || !errorLog.exists()) {
+        errorLog = File(projectDir, "coverage-error.log")
+    }
+
+    if (errorLog.exists() && errorLog.isFile) {
+        errorLog.copyTo(toFile, true)
+        errorLog.delete()
+    }
+}
 
 /*
 JSON format:
@@ -78,11 +92,8 @@ JSON example:
 }
 ```
  */
-private fun Writer.writeModuleReportJson(
-    binaryReportFiles: Iterable<File>,
-    smapFiles: Iterable<File>,
-    sources: Iterable<File>,
-    outputs: Iterable<File>,
+private fun Writer.writeReportsJson(
+    report: Report,
     xmlFile: File?,
     htmlDir: File?
 ) {
@@ -95,30 +106,35 @@ private fun Writer.writeModuleReportJson(
         appendLine("""  "html": "${it.safePath()}",""")
     }
     appendLine("""  "modules": [""")
+    report.projects.forEachIndexed { index, aProject ->
+        writeProjectReportJson(report.files, aProject, index == (report.projects.size - 1))
+    }
+    appendLine("""  ]""")
+    appendLine("}")
+}
+
+private fun Writer.writeProjectReportJson(reportFiles: Iterable<ReportFiles>, projectInfo: ProjectInfo, isLast: Boolean) {
     appendLine("""    { "reports": [ """)
 
-    val smapIterator = smapFiles.iterator()
-    appendLine(binaryReportFiles.joinToString(",\n        ", "        ") { f ->
-        """{"ic": "${f.safePath()}", "smap": "${smapIterator.next().safePath()}"}"""
+    appendLine(reportFiles.joinToString(",\n        ", "        ") { f ->
+        """{"ic": "${f.binary.safePath()}", "smap": "${f.smap!!.safePath()}"}"""
     })
 
     appendLine("""      ], """)
     appendLine("""      "output": [""")
     appendLine(
-        outputs.joinToString(",\n        ", "        ") { f -> '"' + f.safePath() + '"' })
+        projectInfo.outputs.joinToString(",\n        ", "        ") { f -> '"' + f.safePath() + '"' })
     appendLine("""      ],""")
     appendLine("""      "sources": [""")
 
     appendLine(
-        sources.joinToString(",\n        ", "        ") { f -> '"' + f.safePath() + '"' })
+        projectInfo.sources.joinToString(",\n        ", "        ") { f -> '"' + f.safePath() + '"' })
     appendLine("""      ]""")
-    appendLine("""    }""")
-    appendLine("""  ]""")
-    appendLine("}")
+    appendLine("""    }${if (isLast) "" else ","}""")
 }
 
 private fun File.safePath(): String {
-    return canonicalPath.replace("\\","\\\\").replace("\"", "\\\"")
+    return canonicalPath.replace("\\", "\\\\").replace("\"", "\\\"")
 }
 
 internal fun Task.intellijVerification(

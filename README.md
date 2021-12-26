@@ -10,14 +10,14 @@ Minimal supported `Gradle` version: `6.4`.
 ## Table of content
 - [Features](#features)
 - [Quickstart](#quickstart)
-  - [Apply plugin to single-module project](#apply-plugin-to-single-module-project)
+  - [Apply plugin to a single-project build](#apply-plugin-to-a-single-project-build)
     - [Applying plugins with the plugins DSL](#applying-plugins-with-the-plugins-dsl)
     - [Legacy Plugin Application: applying plugins with the buildscript block](#legacy-plugin-application-applying-plugins-with-the-buildscript-block)
-  - [Apply plugin to multi-module project](#apply-plugin-to-multi-module-project)
+  - [Apply plugin to a multi-project build](#apply-plugin-to-a-multi-project-build)
 - [Configuration](#configuration)
   - [Configuring JVM test task](#configuring-jvm-test-task)
-  - [Configuring reports](#configuring-reports)
-  - [Configuring reports collecting](#configuring-reports-collecting)
+  - [Configuring aggregated reports](#configuring-aggregated-reports)
+  - [Configuring project reports](#configuring-project-reports)
   - [Configuring entire plugin](#configuring-entire-plugin)
 - [Verification](#verification)
 - [Tasks](#tasks)
@@ -32,7 +32,7 @@ Minimal supported `Gradle` version: `6.4`.
 * Customizable filters for instrumented classes
 
 ## Quickstart
-### Apply plugin to single-module project
+### Apply plugin to a single-project build
 #### Applying plugins with the plugins DSL
 In top level build file
 
@@ -41,7 +41,7 @@ In top level build file
 
 ```kotlin
 plugins {
-     id("org.jetbrains.kotlinx.kover") version "0.4.4"
+     id("org.jetbrains.kotlinx.kover") version "0.5.0-RC"
 }
 ```
 </details>
@@ -51,7 +51,7 @@ plugins {
 
 ```groovy
 plugins {
-    id 'org.jetbrains.kotlinx.kover' version '0.4.4'
+    id 'org.jetbrains.kotlinx.kover' version '0.5.0-RC'
 }
 ```
 </details>
@@ -69,7 +69,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.jetbrains.kotlinx:kover:0.4.4")
+        classpath("org.jetbrains.kotlinx:kover:0.5.0-RC")
     }
 }
 
@@ -86,7 +86,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.jetbrains.kotlinx:kover:0.4.4'
+        classpath 'org.jetbrains.kotlinx:kover:0.5.0-RC'
     }
 }
   
@@ -94,12 +94,9 @@ apply plugin: 'kover'
 ```
 </details>
 
-### Apply plugin to multi-module project
-To apply the plugin to all modules in the project, you need to apply the plugin only to the root module, as shown [above](#apply-plugin-to-single-module-project).
-
-**There are no dependencies between tasks from different modules, they are executed independently.**
-
-**Cross-module tests are not supported in reports and validation yet. For each test, only the classpath belonging to the current module is taken.**
+### Apply plugin to a multi-project build
+To apply the plugin to all Gradle projects, you just need to apply the plugin only to the root project, as shown [above](#apply-plugin-to-a-single-project-build).
+Applying the plugin to subprojects if you have already applied it to the root project will cause configuration error.
 
 ## Configuration
 
@@ -111,7 +108,7 @@ However, in some cases, custom settings are needed - this can be done by configu
 ### Configuring JVM test task
 If you need to disable or filter instrumentation for a some test task, you may configure the Kover extension for it.
 
-For example, to configure a standard test task for Kotlin/JVM named `test`, you need to add the following code to the build script of the module where this task is declared
+For example, to configure a standard test task for Kotlin/JVM named `test`, you need to add the following code to the build script of the project where this task is declared
 
 <details open>
 <summary>Kotlin</summary>
@@ -119,7 +116,7 @@ For example, to configure a standard test task for Kotlin/JVM named `test`, you 
 ```kotlin
 tasks.test {
     extensions.configure(kotlinx.kover.api.KoverTaskExtension::class) {
-        isEnabled = true
+        isDisabled = false
         binaryReportFile.set(file("$buildDir/custom/result.bin"))
         includes = listOf("com.example.*")
         excludes = listOf("com.example.subpackage.*")
@@ -134,7 +131,7 @@ tasks.test {
 ```groovy
 tasks.test {
     kover {
-        enabled = true
+        disabled = false
         binaryReportFile.set(file("$buildDir/custom/result.bin"))
         includes = ['com.example.*']
         excludes = ['com.example.subpackage.*']
@@ -157,7 +154,7 @@ android {
         unitTests.all {
             if (it.name == "testDebugUnitTest") {
                 extensions.configure(kotlinx.kover.api.KoverTaskExtension::class) {
-                    isEnabled = true
+                    isDisabled = false
                     binaryReportFile.set(file("$buildDir/custom/debug-report.bin"))
                     includes = listOf("com.example.*")
                     excludes = listOf("com.example.subpackage.*")
@@ -181,7 +178,7 @@ android {
         unitTests.all {
             if (name == "testDebugUnitTest") {
                 kover {
-                    enabled = true
+                    disabled = false
                     binaryReportFile.set(file("$buildDir/custom/debug-report.bin"))
                     includes = ['com.example.*']
                     excludes = ['com.example.subpackage.*']
@@ -194,8 +191,11 @@ android {
 </details>
 
 
-### Configuring reports
-If you need to change the name of the XML report file or HTML directory, you may configure the corresponding tasks
+### Configuring aggregated reports
+Aggregated report provides report using combined classpath and coverage stats from the project in which plugin is applied and all its subprojects.
+
+If you need to change the name of the XML report file or HTML directory, you may configure the corresponding tasks in 
+the project in which the plugin is applied (usually this is the root project).
 
 <details open>
 <summary>Kotlin</summary>
@@ -203,12 +203,12 @@ If you need to change the name of the XML report file or HTML directory, you may
 ```kotlin
 tasks.koverHtmlReport {
     isEnabled = true                        // false to disable report generation
-    htmlReportDir.set(layout.buildDirectory.dir("my-reports/html-result"))
+    htmlReportDir.set(layout.buildDirectory.dir("my-agg-report/html-result"))
 }
 
 tasks.koverXmlReport {
     isEnabled = true                        // false to disable report generation
-    xmlReportFile.set(layout.buildDirectory.file("my-reports/result.xml"))
+    xmlReportFile.set(layout.buildDirectory.file("my-agg-report/result.xml"))
 }
 ```
 </details>
@@ -229,15 +229,23 @@ tasks.koverXmlReport {
 ```
 </details>
 
-### Configuring reports collecting
-You may specify custom directory to collect reports from all modules in the build file of the root module:
+### Configuring project reports
+If you need to change the name of the XML report file or HTML directory for a specific project, you may configure 
+the corresponding tasks in this project.
+
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverCollectReports {
-  outputDir.set(layout.buildDirectory.dir("my-reports-dir") )
+tasks.koverHtmlProjectReport {
+    isEnabled = true                        // false to disable report generation
+    htmlReportDir.set(layout.buildDirectory.dir("my-project-report/html-result"))
+}
+
+tasks.koverXmlProjectReport {
+    isEnabled = true                        // false to disable report generation
+    xmlReportFile.set(layout.buildDirectory.file("my-project-report/result.xml"))
 }
 ```
 </details>
@@ -246,25 +254,57 @@ tasks.koverCollectReports {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverCollectReports {
-  outputDir.set(layout.buildDirectory.dir("my-reports-dir") )
+tasks.koverHtmlProjectReport {
+    enabled = true                          // false to disable report generation
+    htmlReportDir.set(layout.buildDirectory.dir("my-project-report/html-result"))
+}
+
+tasks.koverXmlProjectReport {
+    enabled = true                          // false to disable report generation
+    xmlReportFile.set(layout.buildDirectory.file("my-project-report/result.xml"))
+}
+```
+</details>
+
+You may collect all projects reports into one directory using `koverCollectProjectsReports` task.
+Also, you may specify custom directory to collect projects reports in the build file of the project in which the plugin 
+is applied (usually this is the root project):
+
+<details open>
+<summary>Kotlin</summary>
+
+```kotlin
+tasks.koverCollectProjectsReports {
+  outputDir.set(layout.buildDirectory.dir("all-projects-reports") )
+}
+```
+</details>
+
+<details>
+<summary>Groovy</summary>
+
+```groovy
+tasks.koverCollectProjectsReports {
+  outputDir.set(layout.buildDirectory.dir("all-projects-reports") )
 }
 ```
 </details>
 
 ### Configuring entire plugin
-In the module in which the plugin is applied, you need to add code:
+In the project in which the plugin is applied, you need to add code:
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
 kover {
-    isEnabled = true                        // false to disable instrumentation of all test tasks in all modules
+    isDisabled = false                      // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set("1.0.637")    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set("1.0.640")    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set("0.8.7")        // change version of JaCoCo agent and reporter
     generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
+    disabledProjects = setOf()              // setOf("project-name") to disable coverage for project with name `project-name`
+    instrumentAndroidPackage = false        // true to instrument packages `android.*` and `com.android.*`
 }
 ```
 </details>
@@ -274,23 +314,27 @@ kover {
 
 ```groovy
 kover {
-    enabled = true                          // false to disable instrumentation of all test tasks in all modules
+    disabled = false                        // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set('1.0.637')    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set('1.0.640')    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set('0.8.7')        // change version of JaCoCo agent and reporter
     generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
+    disabledProjects = []                   // ["project-name"] to disable coverage for project with name `project-name`
+    instrumentAndroidPackage = false        // true to instrument packages `android.*` and `com.android.*`
 }
 ```
 </details>
 
 ## Verification
-For all test task of module, you can specify one or more rules that check the values of the code coverage counters.
+You may specify one or more rules that check the values of the code coverage counters.
 
 Validation rules work for both types of agents.
 
 *The plugin currently only supports line counter values.*
 
-In the build file of the verified module:
+
+To add a rule check to cover the code of all projects, you need to add configuration to the project in which the plugin
+is applied (usually this is the root project):
 
 <details open>
 <summary>Kotlin</summary>
@@ -298,9 +342,9 @@ In the build file of the verified module:
 ```kotlin
 tasks.koverVerify {
     rule {
-        name = "The project has upper limit on lines covered"
+        name = "Minimum number of lines covered"
         bound {
-            maxValue = 100000
+            minValue = 100000
             valueType = kotlinx.kover.api.VerificationValueType.COVERED_LINES_COUNT
         }
     }
@@ -313,7 +357,7 @@ tasks.koverVerify {
         }
     }
     rule {
-        name = "Minimal line coverage rate in percents"
+        name = "Minimal line coverage rate in percent"
         bound {
             minValue = 50
             // valueType is kotlinx.kover.api.VerificationValueType.COVERED_LINES_PERCENTAGE by default
@@ -329,9 +373,9 @@ tasks.koverVerify {
 ```groovy
 tasks.koverVerify {
     rule {
-        name = "The project doesn't has upper limit on lines covered"
+        name = "Minimum number of lines covered"
         bound {
-            maxValue = 100000
+            minValue = 100000
             valueType = 'COVERED_LINES_COUNT'
         }
     }
@@ -344,7 +388,7 @@ tasks.koverVerify {
         }
     }
     rule {
-        name = "Minimal line coverage rate in percents"
+        name = "Minimal line coverage rate in percent"
         bound {
             minValue = 50
             // valueType is 'COVERED_LINES_PERCENTAGE' by default
@@ -354,19 +398,58 @@ tasks.koverVerify {
 ```
 </details>
 
+To add rules for code coverage checks for one specific project, you need to add a configuration to this project:
+
+<details open>
+<summary>Kotlin</summary>
+
+```kotlin
+tasks.koverProjectVerify {
+    rule {
+        name = "Minimal line coverage rate in percent"
+        bound {
+            minValue = 75
+       }
+    }
+}
+```
+</details>
+
+<details>
+<summary>Groovy</summary>
+
+```groovy
+tasks.koverProjectVerify {
+    rule {
+        name = "Minimal line coverage rate in percent"
+        bound {
+            minValue = 75
+        }
+    }
+}
+```
+</details>
+
+
 ## Tasks
-The plugin, when applied, automatically creates tasks for the module (all modules, if the project is multi-module, and it applied in root build script):
-- `koverXmlReport` - Generates code coverage XML report for all module's test tasks.
-- `koverHtmlReport` - Generates code coverage HTML report for all module's test tasks.
-- `koverReport` - Executes both `koverXmlReport` and `koverHtmlReport` tasks.
-- `koverCollectReports` - Collects reports from all submodules in one directory. Default directory is `$buildDir/reports/kover/all`, names for XML reports and dirs for HTML are projects names. Executing this task does not run `koverXmlReport` or `koverHtmlReport`, it only copies previously created reports if they exist to the output directory.
-- `koverVerify` - Verifies code coverage metrics based on specified rules. Always executes before `check` task.
+The plugin, when applied, automatically creates tasks for the project in which it is applied (usually this is the root project):
+- `koverHtmlReport` - Generates code coverage HTML report for all enabled test tasks in all projects.
+- `koverXmlReport` - Generates code coverage XML report for all enabled test tasks in all projects. 
+- `koverReport` - Executes both `koverXmlReport` and `koverHtmlReport` tasks.  Executes before `check` task if property `generateReportOnCheck` for `KoverExtension` is `true` ([see](#configuring-entire-plugin)).
+- `koverVerify` - Verifies code coverage metrics of all projects based on specified rules. Always executes before `check` task.
+- `koverCollectProjectsReports` - Collects all projects reports into one directory. Default directory is `$buildDir/reports/kover/projects`, names for XML reports and dirs for HTML are projects names. Executing this task does not run `koverXmlReport` or `koverHtmlReport`, it only copies previously created reports if they exist to the output directory.
+
+Tasks that are created for all projects:
+- `koverHtmlProjectReport` - Generates code coverage HTML report for all enabled test tasks in one project.
+- `koverXmlProjectReport` - Generates code coverage XML report for all enabled test tasks in one project.
+- `koverProjectReport` - Executes both `koverXmlProjectReport` and `koverHtmlProjectReport` tasks.
+- `koverProjectVerify` - Verifies code coverage metrics of one project based on specified rules. Always executes before `check` task.
 
 
 ## Implicit plugin dependencies
 During the applying of the plugin, the artifacts of the JaCoCo or IntelliJ toolkit are dynamically loaded. They are downloaded from the `mavenCentral` repository.
 
-For the plugin to work correctly, you need to make sure that the `mavenCentral` or its mirror is added to the list by the repository of the module in which the plugin is applied (usually this is the root module of the project) and add it if necessary.
+For the plugin to work correctly, you need to make sure that the `mavenCentral` or its mirror is added to the list by the repository of the project in which the plugin is applied (usually this is the root project) and add it if necessary.
 
 <details open>
 <summary>Kotlin</summary>

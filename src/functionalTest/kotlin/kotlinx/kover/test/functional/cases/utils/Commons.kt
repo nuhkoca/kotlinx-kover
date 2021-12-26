@@ -5,28 +5,10 @@ import kotlinx.kover.test.functional.core.*
 import kotlinx.kover.test.functional.core.RunResult
 import kotlin.test.*
 
-internal fun RunResult.checkIntellijBinaryReport(binary: String, smap: String, mustExists: Boolean = true) {
-    if (mustExists) {
-        file(binary) {
-            assertTrue { exists() }
-            assertTrue { length() > 0 }
-        }
-        file(smap) {
-            assertTrue { exists() }
-            assertTrue { length() > 0 }
-        }
-    } else {
-        file(binary) {
-            assertFalse { exists() }
-        }
-        file(smap) {
-            assertFalse { exists() }
-        }
-    }
-}
+internal fun RunResult.checkDefaultBinaryReport(mustExist: Boolean = true) {
+    val binary: String = defaultBinaryReport(engine, projectType)
 
-internal fun RunResult.checkJacocoBinaryReport(binary: String, mustExists: Boolean = true) {
-    if (mustExists) {
+    if (mustExist) {
         file(binary) {
             assertTrue { exists() }
             assertTrue { length() > 0 }
@@ -36,12 +18,35 @@ internal fun RunResult.checkJacocoBinaryReport(binary: String, mustExists: Boole
             assertFalse { exists() }
         }
     }
+
+    if (engine == CoverageEngine.INTELLIJ) {
+        val smap = defaultSmapFile(projectType)
+
+        if (mustExist) {
+            file(smap) {
+                assertTrue { exists() }
+                assertTrue { length() > 0 }
+            }
+        } else {
+            file(smap) {
+                assertFalse { exists() }
+            }
+        }
+    }
 }
 
-internal fun RunResult.checkReports(xmlPath: String, htmlPath: String, mustExists: Boolean = true) {
-    if (mustExists) {
+internal fun RunResult.checkDefaultReports(mustExist: Boolean = true) {
+    checkReports(defaultXmlReport(), defaultHtmlReport(), mustExist)
+}
+
+internal fun RunResult.checkDefaultProjectReports(mustExist: Boolean = true) {
+    checkReports(defaultXmlProjectReport(), defaultHtmlProjectReport(), mustExist)
+}
+
+internal fun RunResult.checkReports(xmlPath: String, htmlPath: String, mustExist: Boolean) {
+    if (mustExist) {
         file(xmlPath) {
-            assertTrue { exists() }
+            assertTrue("XML file must exist '$xmlPath'") { exists() }
             assertTrue { length() > 0 }
         }
         file(htmlPath) {
@@ -58,6 +63,21 @@ internal fun RunResult.checkReports(xmlPath: String, htmlPath: String, mustExist
     }
 }
 
+internal fun RunResult.checkIntellijErrors(errorExpected: Boolean = false) {
+    if (engine != CoverageEngine.INTELLIJ) return
+
+    file(errorsDirectory()) {
+        if (this.exists() && !errorExpected) {
+            val errorLogs = this.listFiles()?.map { it.name } ?: emptyList()
+            throw AssertionError("Detected IntelliJ Coverage Engine errors: $errorLogs")
+        }
+    }
+}
+
+internal fun assertCounterAbsent(counter: Counter?) {
+    assertNull(counter)
+}
+
 internal fun assertCounterExcluded(counter: Counter?, engine: CoverageEngine) {
     if (engine == CoverageEngine.INTELLIJ) {
         assertNull(counter)
@@ -67,7 +87,15 @@ internal fun assertCounterExcluded(counter: Counter?, engine: CoverageEngine) {
     }
 }
 
-internal fun assertCounterCoveredAndIncluded(counter: Counter?) {
+internal fun assertCounterCovered(counter: Counter?) {
     assertNotNull(counter)
     assertTrue { counter.covered > 0 }
 }
+
+internal fun assertCounterFullyCovered(counter: Counter?) {
+    assertNotNull(counter)
+    assertTrue { counter.covered > 0 }
+    assertEquals(0, counter.missed)
+}
+
+

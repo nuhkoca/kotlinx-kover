@@ -11,10 +11,10 @@ import org.gradle.api.tasks.*
 open class KoverExtension(objects: ObjectFactory) {
 
     /**
-     * Specifies whether the plugin is applied to the test task and configures it to collect and generate coverage data.
+     * Specifies whether instrumentation is disabled for all test tasks of all projects.
      */
     @get:Input
-    public var isEnabled: Boolean = true
+    public var isDisabled: Boolean = false
 
     /**
      * Specifies the coverage engine to be used to collect execution data.
@@ -39,6 +39,18 @@ open class KoverExtension(objects: ObjectFactory) {
      */
     @get:Input
     val generateReportOnCheck: Property<Boolean> = objects.property(Boolean::class.java)
+
+    /**
+     * Specifies the projects to be disabled from instrumentation and reportings.
+     */
+    @get:Input
+    var disabledProjects: Set<String> = emptySet()
+
+    /**
+     * Specifies whether the classes from 'android' and 'com.android' packages should be included if Android plugin is applied.
+     */
+    @get:Input
+    public var instrumentAndroidPackage: Boolean = false
 }
 
 public enum class CoverageEngine {

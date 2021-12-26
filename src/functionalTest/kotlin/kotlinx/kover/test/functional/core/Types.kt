@@ -8,7 +8,7 @@ internal enum class GradleScriptLanguage { KOTLIN, GROOVY }
 
 internal enum class ProjectType { KOTLIN_JVM, KOTLIN_MULTIPLATFORM, ANDROID }
 
-internal interface ModuleBuilder<B : ModuleBuilder<B>> {
+internal interface ProjectBuilder<B : ProjectBuilder<B>> {
     fun sources(template: String): B
     fun verification(rules: Iterable<VerificationRule>): B
 
@@ -17,19 +17,23 @@ internal interface ModuleBuilder<B : ModuleBuilder<B>> {
 
     fun config(script: String): B
     fun config(kotlin: String, groovy: String): B
+
+    fun dependency(script: String): B
+    fun dependency(kotlin: String, groovy: String): B
 }
 
-internal interface ProjectBuilder : ModuleBuilder<ProjectBuilder> {
-    fun case(description: String): ProjectBuilder
-    fun languages(vararg languages: GradleScriptLanguage): ProjectBuilder
-    fun engines(vararg engines: CoverageEngine): ProjectBuilder
-    fun types(vararg types: ProjectType): ProjectBuilder
+internal interface TestCaseBuilder : ProjectBuilder<TestCaseBuilder> {
+    fun languages(vararg languages: GradleScriptLanguage): TestCaseBuilder
+    fun engines(vararg engines: CoverageEngine): TestCaseBuilder
+    fun types(vararg types: ProjectType): TestCaseBuilder
 
-    fun configKover(config: KoverRootConfig.() -> Unit): ProjectBuilder
+    fun withLocalCache(): TestCaseBuilder
 
-    fun submodule(name: String, builder: ModuleBuilder<*>.() -> Unit): ModuleBuilder<*>
+    fun configKover(config: KoverRootConfig.() -> Unit): TestCaseBuilder
 
-    fun build(): ProjectRunner
+    fun subproject(name: String, builder: ProjectBuilder<*>.() -> Unit): TestCaseBuilder
+
+    fun build(): GradleRunner
 }
 
 internal data class ProjectSlice(val language: GradleScriptLanguage, val type: ProjectType, val engine: CoverageEngine?) {
@@ -42,18 +46,22 @@ internal data class KoverRootConfig(
     var disabled: Boolean? = null,
     var intellijVersion: String? = null,
     var jacocoVersion: String? = null,
-    var generateReportOnCheck: Boolean? = null
+    var generateReportOnCheck: Boolean? = null,
+    val disabledProjects: MutableSet<String> = mutableSetOf()
 ) {
     val isDefault =
         disabled == null && intellijVersion == null && jacocoVersion == null && generateReportOnCheck == null
 }
 
-internal interface ProjectRunner {
-    fun run(vararg args: String, checker: RunResult.() -> Unit): ProjectRunner
+internal interface GradleRunner {
+    fun run(vararg args: String, checker: RunResult.() -> Unit = {}): GradleRunner
 }
 
 internal interface RunResult {
     val engine: CoverageEngine
+    val projectType: ProjectType
+
+    fun subproject(name: String, checker: RunResult.() -> Unit)
 
     fun output(checker: String.() -> Unit)
 
