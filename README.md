@@ -7,7 +7,7 @@ and [JaCoCo](https://github.com/jacoco/jacoco).
 
 Minimal supported `Gradle` version: `6.4`. 
 
-## Table of content
+## Table of contents
 - [Features](#features)
 - [Quickstart](#quickstart)
   - [Apply plugin to a single-project build](#apply-plugin-to-a-single-project-build)
@@ -16,7 +16,7 @@ Minimal supported `Gradle` version: `6.4`.
   - [Apply plugin to a multi-project build](#apply-plugin-to-a-multi-project-build)
 - [Configuration](#configuration)
   - [Configuring JVM test task](#configuring-jvm-test-task)
-  - [Configuring aggregated reports](#configuring-aggregated-reports)
+  - [Configuring merged reports](#configuring-merged-reports)
   - [Configuring project reports](#configuring-project-reports)
   - [Configuring entire plugin](#configuring-entire-plugin)
 - [Verification](#verification)
@@ -25,23 +25,23 @@ Minimal supported `Gradle` version: `6.4`.
 
 ## Features
 
-* Collecting the code coverage for `JVM` test tasks
-* `XML` and `HTML` reports generation
+* Collecting code coverage for `JVM` test tasks
+* `XML` and `HTML` report generation
 * Support of `Kotlin/JVM`, `Kotlin Multiplatform` and mixed `Kotlin-Java` sources with zero additional configuration
-* `Kotlin Android` support without dividing them into build types and flavours
+* `Kotlin Android` support without the need to divide into build types and flavours
 * Customizable filters for instrumented classes
 
 ## Quickstart
 ### Apply plugin to a single-project build
 #### Applying plugins with the plugins DSL
-In top level build file
+In top-level build file:
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
 plugins {
-     id("org.jetbrains.kotlinx.kover") version "0.5.0-RC"
+     id("org.jetbrains.kotlinx.kover") version "0.5.0-RC2"
 }
 ```
 </details>
@@ -51,13 +51,13 @@ plugins {
 
 ```groovy
 plugins {
-    id 'org.jetbrains.kotlinx.kover' version '0.5.0-RC'
+    id 'org.jetbrains.kotlinx.kover' version '0.5.0-RC2'
 }
 ```
 </details>
 
 #### Legacy Plugin Application: applying plugins with the buildscript block
-In top level build file
+In top-level build file:
 
 <details open>
 <summary>Kotlin</summary>
@@ -69,7 +69,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.jetbrains.kotlinx:kover:0.5.0-RC")
+        classpath("org.jetbrains.kotlinx:kover:0.5.0-RC2")
     }
 }
 
@@ -86,7 +86,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.jetbrains.kotlinx:kover:0.5.0-RC'
+        classpath 'org.jetbrains.kotlinx:kover:0.5.0-RC2'
     }
 }
   
@@ -95,20 +95,20 @@ apply plugin: 'kover'
 </details>
 
 ### Apply plugin to a multi-project build
-To apply the plugin to all Gradle projects, you just need to apply the plugin only to the root project, as shown [above](#apply-plugin-to-a-single-project-build).
-Applying the plugin to subprojects if you have already applied it to the root project will cause configuration error.
+To apply the plugin to all Gradle projects, you only need to apply the plugin to the top-level build file as shown [above](#apply-plugin-to-a-single-project-build).
+Applying the plugin to subprojects if you have already applied it to the root project will cause configuration errors.
 
 ## Configuration
 
-Once applied, the plugin can be used out of the box without additional configuration. 
+Once applied, the Kover plugin can be used out of the box without additional configuration. 
 
 However, in some cases, custom settings are needed - this can be done by configuring special extensions and tasks.
 
 
 ### Configuring JVM test task
-If you need to disable or filter instrumentation for a some test task, you may configure the Kover extension for it.
+If you need to disable or filter instrumentation for a test task, you may configure the Kover extension for it.
 
-For example, to configure a standard test task for Kotlin/JVM named `test`, you need to add the following code to the build script of the project where this task is declared
+For example, to configure a standard test task for Kotlin/JVM named `test`, you need to add the following code to the build script of the project where this task is declared:
 
 <details open>
 <summary>Kotlin</summary>
@@ -140,7 +140,7 @@ tasks.test {
 ```
 </details>
 
-**For other platforms (Android, Kotlin-Multiplatform) the name may differ, you may also have several test tasks, so you first need to determine the name of the required task.**
+**For other platforms (Android, Kotlin-Multiplatform) the names may differ and you may also have several test tasks, so you first need to determine the name of the required task.**
 
 Example of configuring test task for build type `debug` in Android:
 <details open>
@@ -153,7 +153,7 @@ android {
     testOptions {
         unitTests.all {
             if (it.name == "testDebugUnitTest") {
-                extensions.configure(kotlinx.kover.api.KoverTaskExtension::class) {
+                it.extensions.configure(kotlinx.kover.api.KoverTaskExtension::class) {
                     isDisabled = false
                     binaryReportFile.set(file("$buildDir/custom/debug-report.bin"))
                     includes = listOf("com.example.*")
@@ -191,24 +191,30 @@ android {
 </details>
 
 
-### Configuring aggregated reports
-Aggregated report provides report using combined classpath and coverage stats from the project in which plugin is applied and all its subprojects.
+### Configuring merged reports
+Merged reports combine classpath and coverage stats from the project in which the plugin is applied and all of its subprojects.
 
 If you need to change the name of the XML report file or HTML directory, you may configure the corresponding tasks in 
-the project in which the plugin is applied (usually this is the root project).
+the project in which the plugin is applied (usually this is the root project):
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverHtmlReport {
+tasks.koverMergedHtmlReport {
     isEnabled = true                        // false to disable report generation
-    htmlReportDir.set(layout.buildDirectory.dir("my-agg-report/html-result"))
+    htmlReportDir.set(layout.buildDirectory.dir("my-merged-report/html-result"))
+
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes
 }
 
-tasks.koverXmlReport {
+tasks.koverMergedXmlReport {
     isEnabled = true                        // false to disable report generation
-    xmlReportFile.set(layout.buildDirectory.file("my-agg-report/result.xml"))
+    xmlReportFile.set(layout.buildDirectory.file("my-merged-report/result.xml"))
+
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes  
 }
 ```
 </details>
@@ -217,35 +223,47 @@ tasks.koverXmlReport {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverHtmlReport {
+tasks.koverMergedHtmlReport {
     enabled = true                          // false to disable report generation
-    htmlReportDir.set(layout.buildDirectory.dir("my-reports/html-result"))
+    htmlReportDir.set(layout.buildDirectory.dir("my-merged-report/html-result"))
+
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes
 }
 
-tasks.koverXmlReport {
+tasks.koverMergedXmlReport {
     enabled = true                          // false to disable report generation
-    xmlReportFile.set(layout.buildDirectory.file("my-reports/result.xml"))
+    xmlReportFile.set(layout.buildDirectory.file("my-merged-report/result.xml"))
+
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes
 }
 ```
 </details>
 
 ### Configuring project reports
 If you need to change the name of the XML report file or HTML directory for a specific project, you may configure 
-the corresponding tasks in this project.
+the corresponding tasks in this project:
 
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverHtmlProjectReport {
+tasks.koverHtmlReport {
     isEnabled = true                        // false to disable report generation
     htmlReportDir.set(layout.buildDirectory.dir("my-project-report/html-result"))
+
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes  
 }
 
-tasks.koverXmlProjectReport {
+tasks.koverXmlReport {
     isEnabled = true                        // false to disable report generation
     xmlReportFile.set(layout.buildDirectory.file("my-project-report/result.xml"))
+
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes 
 }
 ```
 </details>
@@ -254,27 +272,38 @@ tasks.koverXmlProjectReport {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverHtmlProjectReport {
+tasks.koverHtmlReport {
     enabled = true                          // false to disable report generation
     htmlReportDir.set(layout.buildDirectory.dir("my-project-report/html-result"))
+
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes  
 }
 
-tasks.koverXmlProjectReport {
+tasks.koverXmlReport {
     enabled = true                          // false to disable report generation
     xmlReportFile.set(layout.buildDirectory.file("my-project-report/result.xml"))
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes  
 }
 ```
 </details>
 
-You may collect all projects reports into one directory using `koverCollectProjectsReports` task.
-Also, you may specify custom directory to collect projects reports in the build file of the project in which the plugin 
+By default, for tasks `koverHtmlReport` and `koverXmlReport` coverage is calculated only for the tests of the one project.
+If classes or functions are called from tests of another module, then you need to set a flag `runAllTestsForProjectTask` for `KoverExtension` to `true` ([see](#configuring-entire-plugin)).
+
+**In this case, then running tasks `koverHtmlReport` or `koverXmlReport` will trigger the execution of all active tests from all projects!**
+
+
+You may collect all project reports into one directory using the `koverCollectReports` task.
+Also, you may specify a custom directory to collect project reports in the build directory of the project in which the plugin 
 is applied (usually this is the root project):
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverCollectProjectsReports {
+tasks.koverCollectReports {
   outputDir.set(layout.buildDirectory.dir("all-projects-reports") )
 }
 ```
@@ -284,14 +313,14 @@ tasks.koverCollectProjectsReports {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverCollectProjectsReports {
+tasks.koverCollectReports {
   outputDir.set(layout.buildDirectory.dir("all-projects-reports") )
 }
 ```
 </details>
 
 ### Configuring entire plugin
-In the project in which the plugin is applied, you need to add code:
+In the project in which the plugin is applied, you can configure the following properties:
 
 <details open>
 <summary>Kotlin</summary>
@@ -300,11 +329,12 @@ In the project in which the plugin is applied, you need to add code:
 kover {
     isDisabled = false                      // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set("1.0.640")    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set("1.0.647")    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set("0.8.7")        // change version of JaCoCo agent and reporter
-    generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
+    generateReportOnCheck = true            // false to do not execute `koverMergedReport` task before `check` task
     disabledProjects = setOf()              // setOf("project-name") to disable coverage for project with name `project-name`
     instrumentAndroidPackage = false        // true to instrument packages `android.*` and `com.android.*`
+    runAllTestsForProjectTask = false       // true to run all tests in all projects if `koverHtmlReport`, `koverXmlReport`, `koverReport`, `koverVerify` or `check` tasks executed on some project
 }
 ```
 </details>
@@ -316,11 +346,12 @@ kover {
 kover {
     disabled = false                        // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set('1.0.640')    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set('1.0.647')    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set('0.8.7')        // change version of JaCoCo agent and reporter
-    generateReportOnCheck.set(true)         // false to do not execute `koverReport` task before `check` task
+    generateReportOnCheck = true            // false to do not execute `koverMergedReport` task before `check` task
     disabledProjects = []                   // ["project-name"] to disable coverage for project with name `project-name`
     instrumentAndroidPackage = false        // true to instrument packages `android.*` and `com.android.*`
+    runAllTestsForProjectTask = false       // true to run all tests in all projects if `koverHtmlReport`, `koverXmlReport`, `koverReport`, `koverVerify` or `check` tasks executed on some project
 }
 ```
 </details>
@@ -333,14 +364,17 @@ Validation rules work for both types of agents.
 *The plugin currently only supports line counter values.*
 
 
-To add a rule check to cover the code of all projects, you need to add configuration to the project in which the plugin
+To add a rule to check coverage of the code of all projects, you need to add configuration to the project in which the plugin
 is applied (usually this is the root project):
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverVerify {
+tasks.koverMergedVerify {
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes
+  
     rule {
         name = "Minimum number of lines covered"
         bound {
@@ -371,7 +405,10 @@ tasks.koverVerify {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverVerify {
+tasks.koverMergedVerify {
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes
+  
     rule {
         name = "Minimum number of lines covered"
         bound {
@@ -398,13 +435,16 @@ tasks.koverVerify {
 ```
 </details>
 
-To add rules for code coverage checks for one specific project, you need to add a configuration to this project:
+To add rules for code coverage checks for the code of one specific project, you need to add a configuration to this project:
 
 <details open>
 <summary>Kotlin</summary>
 
 ```kotlin
-tasks.koverProjectVerify {
+tasks.koverVerify {
+    includes = listOf("com.example.*")            // inclusion rules for classes
+    excludes = listOf("com.example.subpackage.*") // exclusion rules for classes
+
     rule {
         name = "Minimal line coverage rate in percent"
         bound {
@@ -419,7 +459,10 @@ tasks.koverProjectVerify {
 <summary>Groovy</summary>
 
 ```groovy
-tasks.koverProjectVerify {
+tasks.koverVerify {
+    includes = ['com.example.*']             // inclusion rules for classes
+    excludes = ['com.example.subpackage.*']  // exclusion rules for classes
+  
     rule {
         name = "Minimal line coverage rate in percent"
         bound {
@@ -430,26 +473,30 @@ tasks.koverProjectVerify {
 ```
 </details>
 
+By default, for the task `koverVerify` coverage is calculated only for the tests of the one project. 
+If classes or functions are called from tests of another module, then you need to set a flag `runAllTestsForProjectTask` for `KoverExtension` to `true` ([see](#configuring-entire-plugin)). 
+
+**In this case, if verification rules are added, then running tasks `koverVerify` or `check` will trigger the execution of all active tests from all projects!**
 
 ## Tasks
 The plugin, when applied, automatically creates tasks for the project in which it is applied (usually this is the root project):
-- `koverHtmlReport` - Generates code coverage HTML report for all enabled test tasks in all projects.
-- `koverXmlReport` - Generates code coverage XML report for all enabled test tasks in all projects. 
-- `koverReport` - Executes both `koverXmlReport` and `koverHtmlReport` tasks.  Executes before `check` task if property `generateReportOnCheck` for `KoverExtension` is `true` ([see](#configuring-entire-plugin)).
-- `koverVerify` - Verifies code coverage metrics of all projects based on specified rules. Always executes before `check` task.
-- `koverCollectProjectsReports` - Collects all projects reports into one directory. Default directory is `$buildDir/reports/kover/projects`, names for XML reports and dirs for HTML are projects names. Executing this task does not run `koverXmlReport` or `koverHtmlReport`, it only copies previously created reports if they exist to the output directory.
+- `koverMergedHtmlReport` - Generates code coverage HTML report for all enabled test tasks in all projects.
+- `koverMergedXmlReport` - Generates code coverage XML report for all enabled test tasks in all projects. 
+- `koverMergedReport` - Executes both `koverMergedXmlReport` and `koverMergedHtmlReport` tasks.  Executes before `check` task if property `generateReportOnCheck` for `KoverExtension` is `true` ([see](#configuring-entire-plugin)).
+- `koverMergedVerify` - Verifies code coverage metrics of all projects based on specified rules. Always executes before `check` task.
+- `koverCollectReports` - Collects all projects reports into one directory. Default directory is `$buildDir/reports/kover/projects`, names for XML reports and dirs for HTML are projects names. Executing this task does not run `koverMergedXmlReport` or `koverMergedHtmlReport`, it only copies previously created reports if they exist to the output directory.
 
 Tasks that are created for all projects:
-- `koverHtmlProjectReport` - Generates code coverage HTML report for all enabled test tasks in one project.
-- `koverXmlProjectReport` - Generates code coverage XML report for all enabled test tasks in one project.
-- `koverProjectReport` - Executes both `koverXmlProjectReport` and `koverHtmlProjectReport` tasks.
-- `koverProjectVerify` - Verifies code coverage metrics of one project based on specified rules. Always executes before `check` task.
+- `koverHtmlReport` - Generates code coverage HTML report for all enabled test tasks in one project.
+- `koverXmlReport` - Generates code coverage XML report for all enabled test tasks in one project.
+- `koverReport` - Executes both `koverXmlReport` and `koverHtmlReport` tasks.
+- `koverVerify` - Verifies code coverage metrics of one project based on specified rules. Always executes before `check` task.
 
 
 ## Implicit plugin dependencies
-During the applying of the plugin, the artifacts of the JaCoCo or IntelliJ toolkit are dynamically loaded. They are downloaded from the `mavenCentral` repository.
+While the plugin is being applied, the artifacts of the JaCoCo or IntelliJ toolkit are dynamically loaded. They are downloaded from the `mavenCentral` repository.
 
-For the plugin to work correctly, you need to make sure that the `mavenCentral` or its mirror is added to the list by the repository of the project in which the plugin is applied (usually this is the root project) and add it if necessary.
+For the plugin to work correctly, you need to make sure that the `mavenCentral` (or its mirror) is added to the repository list of the project in which the plugin is applied, if it doesn't already exist (usually this is the root project):
 
 <details open>
 <summary>Kotlin</summary>
