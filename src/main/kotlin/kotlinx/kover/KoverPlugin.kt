@@ -39,8 +39,6 @@ class KoverPlugin : Plugin<Project> {
     private val defaultJacocoVersion = "0.8.7"
 
     override fun apply(target: Project) {
-        target.checkAlreadyApplied()
-
         val koverExtension = target.createKoverExtension()
         val agents = AgentsFactory.createAgents(target, koverExtension)
 
@@ -54,7 +52,7 @@ class KoverPlugin : Plugin<Project> {
         target.createMergedTasks(providers)
     }
 
-    private fun Project.applyToProject(providers: AllProviders, agents: Map<CoverageEngine, CoverageAgent>) {
+    private fun Project.applyToProject(providers: BuildProviders, agents: Map<CoverageEngine, CoverageAgent>) {
         val projectProviders =
             providers.projects[name] ?: throw GradleException("Kover: Providers for project '$name' was not found")
 
@@ -102,11 +100,11 @@ class KoverPlugin : Plugin<Project> {
         }
 
         tasks.withType(Test::class.java).configureEach { t ->
-            t.configTest(providers, agents)
+            t.configTestTask(providers, agents)
         }
     }
 
-    private fun Project.createMergedTasks(providers: AllProviders) {
+    private fun Project.createMergedTasks(providers: BuildProviders) {
         val xmlReportTask = createKoverMergedTask(
             MERGED_XML_REPORT_TASK_NAME,
             KoverMergedXmlReportTask::class,
@@ -159,7 +157,7 @@ class KoverPlugin : Plugin<Project> {
     private fun <T : KoverMergedTask> Project.createKoverMergedTask(
         taskName: String,
         type: KClass<T>,
-        providers: AllProviders,
+        providers: BuildProviders,
         block: (T) -> Unit
     ): T {
         return tasks.create(taskName, type.java) { task ->
@@ -174,6 +172,8 @@ class KoverPlugin : Plugin<Project> {
             task.coverageEngine.set(providers.engine)
             task.classpath.set(providers.classpath)
             task.dependsOn(providers.merged.tests)
+
+            task.onlyIf { !providers.merged.disabled.get() }
 
             block(task)
         }
@@ -206,10 +206,14 @@ class KoverPlugin : Plugin<Project> {
     private fun <T : KoverProjectTask> Project.createKoverProjectTask(
         taskName: String,
         type: KClass<T>,
-        providers: AllProviders,
+        providers: BuildProviders,
         projectProviders: ProjectProviders,
         block: (T) -> Unit
     ): T {
+        tasks.findByName(taskName)?.let {
+            throw GradleException("Kover task '$taskName' already exist. Plugin should not be applied in child project if it has already been applied in one of the parent projects.")
+        }
+
         return tasks.create(taskName, type.java) { task ->
             task.group = VERIFICATION_GROUP
 
@@ -238,8 +242,8 @@ class KoverPlugin : Plugin<Project> {
         return extension
     }
 
-    private fun Test.configTest(
-        providers: AllProviders,
+    private fun Test.configTestTask(
+        providers: BuildProviders,
         agents: Map<CoverageEngine, CoverageAgent>
     ) {
         val taskExtension = extensions.create(TASK_EXTENSION_NAME, KoverTaskExtension::class.java, project.objects)
@@ -263,22 +267,39 @@ class KoverPlugin : Plugin<Project> {
             )
         )
 
-        doLast(IntellijErrorLogChecker(taskExtension))
+        doFirst(BinaryReportCleanupAction(providers.koverExtension, taskExtension))
+        doLast(IntellijErrorLogCopyAction(taskExtension))
     }
+}
 
-    private fun Project.checkAlreadyApplied() {
-        var parent = parent
+/*
+  To support parallel tests, both Coverage Engines work in append to data file mode.
+  For this reason, before starting the tests, it is necessary to clear the file from the results of previous runs.
+*/
+private class BinaryReportCleanupAction(
+    private val koverExtensionProvider: Provider<KoverExtension>,
+    private val taskExtension: KoverTaskExtension
+) : Action<Task> {
+    override fun execute(task: Task) {
+        val koverExtension = koverExtensionProvider.get()
+        val file = taskExtension.binaryReportFile.get()
 
-        while (parent != null) {
-            if (parent.plugins.hasPlugin(KoverPlugin::class.java)) {
-                throw GradleException("Kover plugin is applied in both parent project '${parent.name}' and child project '${this.name}'. Kover plugin should be applied only in parent project.")
-            }
-            parent = this.parent
+        // always delete previous data file
+        file.delete()
+
+        if (!taskExtension.isDisabled
+            && !koverExtension.isDisabled
+            && !koverExtension.disabledProjects.contains(task.project.name)
+            && koverExtension.coverageEngine.get() == CoverageEngine.INTELLIJ
+        ) {
+            // IntelliJ engine expected empty file for parallel test execution.
+            // Since it is impossible to know in advance whether the tests will be run in parallel, we always create an empty file.
+            file.createNewFile()
         }
     }
 }
 
-private class IntellijErrorLogChecker(private val taskExtension: KoverTaskExtension) : Action<Task> {
+private class IntellijErrorLogCopyAction(private val taskExtension: KoverTaskExtension) : Action<Task> {
     override fun execute(task: Task) {
         task.project.copyIntellijErrorLog(
             task.project.layout.buildDirectory.get().file("kover/errors/${task.name}.log").asFile,

@@ -3,6 +3,7 @@ package kotlinx.kover.test.functional.cases.utils
 import kotlinx.kover.api.*
 import kotlinx.kover.test.functional.core.*
 import kotlinx.kover.test.functional.core.RunResult
+import org.gradle.testkit.runner.*
 import kotlin.test.*
 
 internal fun RunResult.checkDefaultBinaryReport(mustExist: Boolean = true) {
@@ -20,12 +21,18 @@ internal fun RunResult.checkDefaultBinaryReport(mustExist: Boolean = true) {
     }
 }
 
+internal fun RunResult.checkDefaultMergedReports(mustExist: Boolean = true) {
+    checkReports(defaultMergedXmlReport(), defaultMergedHtmlReport(), mustExist)
+}
+
 internal fun RunResult.checkDefaultReports(mustExist: Boolean = true) {
     checkReports(defaultXmlReport(), defaultHtmlReport(), mustExist)
 }
 
-internal fun RunResult.checkDefaultProjectReports(mustExist: Boolean = true) {
-    checkReports(defaultXmlProjectReport(), defaultHtmlProjectReport(), mustExist)
+internal fun RunResult.checkOutcome(taskName: String, outcome: TaskOutcome) {
+    outcome(taskName) {
+        assertEquals(outcome, this)
+    }
 }
 
 internal fun RunResult.checkReports(xmlPath: String, htmlPath: String, mustExist: Boolean) {
@@ -59,24 +66,37 @@ internal fun RunResult.checkIntellijErrors(errorExpected: Boolean = false) {
     }
 }
 
-internal fun assertCounterAbsent(counter: Counter?) {
-    assertNull(counter)
+internal fun Counter?.assertAbsent() {
+    assertNull(this)
 }
 
-internal fun assertCounterNotCovered(counter: Counter?) {
-    assertNotNull(counter)
-    assertEquals(0, counter.covered)
+internal fun Counter?.assertFullyMissed() {
+    assertNotNull(this)
+    assertTrue { this.missed > 0 }
+    assertEquals(0, this.covered)
 }
 
-internal fun assertCounterCovered(counter: Counter?) {
-    assertNotNull(counter)
-    assertTrue { counter.covered > 0 }
+internal fun Counter?.assertCovered() {
+    assertNotNull(this)
+    assertTrue { this.covered > 0 }
 }
 
-internal fun assertCounterFullyCovered(counter: Counter?) {
-    assertNotNull(counter)
-    assertTrue { counter.covered > 0 }
-    assertEquals(0, counter.missed)
+
+internal fun Counter?.assertTotal(count: Int) {
+    assertNotNull(this)
+    assertEquals(count, covered + missed)
+}
+
+internal fun Counter?.assertCovered(covered: Int, missed: Int) {
+    assertNotNull(this)
+    assertEquals(covered, this.covered)
+    assertEquals(missed, this.missed)
+}
+
+internal fun Counter?.assertFullyCovered() {
+    assertNotNull(this)
+    assertTrue { this.covered > 0 }
+    assertEquals(0, this.missed)
 }
 
 

@@ -41,7 +41,7 @@ In top-level build file:
 
 ```kotlin
 plugins {
-     id("org.jetbrains.kotlinx.kover") version "0.5.0-RC2"
+     id("org.jetbrains.kotlinx.kover") version "0.5.0"
 }
 ```
 </details>
@@ -51,7 +51,7 @@ plugins {
 
 ```groovy
 plugins {
-    id 'org.jetbrains.kotlinx.kover' version '0.5.0-RC2'
+    id 'org.jetbrains.kotlinx.kover' version '0.5.0'
 }
 ```
 </details>
@@ -69,7 +69,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.jetbrains.kotlinx:kover:0.5.0-RC2")
+        classpath("org.jetbrains.kotlinx:kover:0.5.0")
     }
 }
 
@@ -86,7 +86,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.jetbrains.kotlinx:kover:0.5.0-RC2'
+        classpath 'org.jetbrains.kotlinx:kover:0.5.0'
     }
 }
   
@@ -329,7 +329,7 @@ In the project in which the plugin is applied, you can configure the following p
 kover {
     isDisabled = false                      // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set("1.0.647")    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set("1.0.656")    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set("0.8.7")        // change version of JaCoCo agent and reporter
     generateReportOnCheck = true            // false to do not execute `koverMergedReport` task before `check` task
     disabledProjects = setOf()              // setOf("project-name") to disable coverage for project with name `project-name`
@@ -346,7 +346,7 @@ kover {
 kover {
     disabled = false                        // true to disable instrumentation of all test tasks in all projects
     coverageEngine.set(kotlinx.kover.api.CoverageEngine.INTELLIJ) // change instrumentation agent and reporter
-    intellijEngineVersion.set('1.0.647')    // change version of IntelliJ agent and reporter
+    intellijEngineVersion.set('1.0.656')    // change version of IntelliJ agent and reporter
     jacocoEngineVersion.set('0.8.7')        // change version of JaCoCo agent and reporter
     generateReportOnCheck = true            // false to do not execute `koverMergedReport` task before `check` task
     disabledProjects = []                   // ["project-name"] to disable coverage for project with name `project-name`
